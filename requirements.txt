@@ -1,0 +1,23 @@
+# Web Framework and API
+fastapi
+uvicorn
+streamlit
+
+# Data Processing
+pandas
+numpy
+plotly
+
+# AI and Machine Learning
+google-generativeai
+
+# Utilities
+python-dotenv
+requests
+pydantic
+
+# Optional Dependencies
+scikit-learn
+jupyter
+python-multipart
+typing-extensions

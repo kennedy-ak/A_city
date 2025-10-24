@@ -1,30 +1,15 @@
 """
-AFRIMASH CUSTOMER INTELLIGENCE DASHBOARD - ENHANCED VERSION
+AFRIMASH CUSTOMER INTELLIGENCE DASHBOARD
 Interactive Streamlit Application
-
-ENHANCEMENTS:
-- Fixed file paths (relative paths instead of absolute)
-- Added ROI Calculator page
-- Added Architecture & Roadmap page
-- Added export functionality throughout
-- Added global filters in sidebar
-- Enhanced visualizations
-- Better error handling
-
-Version: 2.0
-Last Updated: 2025-10-24
 """
 
 import streamlit as st
 import pandas as pd
 import numpy as np
-import requests
 import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime
 import warnings
-import io
-import base64
 warnings.filterwarnings('ignore')
 
 # Page configuration
@@ -75,17 +60,6 @@ st.markdown("""
         border-radius: 0.5rem;
         margin: 1rem 0;
     }
-    .info-box {
-        background-color: #d1ecf1;
-        border-left: 4px solid #17a2b8;
-        padding: 1rem;
-        border-radius: 0.5rem;
-        margin: 1rem 0;
-    }
-    .stDownloadButton button {
-        background-color: #2E86AB;
-        color: white;
-    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -100,42 +74,31 @@ def load_data():
         # Parse dates
         transactions['Date'] = pd.to_datetime(transactions['Date'])
         
-        # Try to load optional files
-        try:
-            cross_sell = pd.read_csv('cross_sell_opportunities.csv')
-        except:
-            cross_sell = None
-
-        try:
-            high_risk = pd.read_csv('high_risk_customers.csv')
-        except:
-            high_risk = None
-
-        return rfm_data, transactions, recommendations, cross_sell, high_risk
+        return rfm_data, transactions, recommendations
     except Exception as e:
         st.error(f"Error loading data: {e}")
         return None, None, None
 
 # Load data
-rfm_data, transactions, recommendations, cross_sell, high_risk = load_data()
+rfm_data, transactions, recommendations = load_data()
 
 if rfm_data is not None:
     
     # Sidebar
-    st.sidebar.image("https://via.placeholder.com/200x80/2E86AB/FFFFFF?text=AFRIMASH", use_container_width=True)
+    st.sidebar.image("https://via.placeholder.com/200x80/2E86AB/FFFFFF?text=AFRIMASH", width='stretch')
     st.sidebar.title("🌾 Navigation")
     
     page = st.sidebar.radio(
         "Select View",
         ["📊 Executive Dashboard", "👥 Customer Segments", "🔮 Predictive Analytics", 
-         "🎯 Recommendations", "🔍 Customer Search", "📈 Business Insights", "🤖 AI Insight Engine"]
+         "🎯 Recommendations", "🔍 Customer Search", "📈 Business Insights"]
     )
     
     st.sidebar.markdown("---")
     st.sidebar.info(f"""
     **Data Overview**
     - Total Customers: {len(rfm_data):,}
-    - Total Revenue: GH₵{rfm_data['Monetary'].sum():,.0f}
+    - Total Revenue: ₵{rfm_data['Monetary'].sum():,.0f}
     - Analysis Date: {datetime.now().strftime('%Y-%m-%d')}
     """)
     
@@ -158,8 +121,8 @@ if rfm_data is not None:
             total_revenue = rfm_data['Monetary'].sum()
             st.metric(
                 "Total Revenue",
-                f"GH₵{total_revenue/1e9:.2f}B",
-                delta=f"GH₵{rfm_data['Predicted_CLV'].sum()/1e9:.2f}B Predicted"
+                f"₵{total_revenue/1e9:.2f}B",
+                delta=f"₵{rfm_data['Predicted_CLV'].sum()/1e9:.2f}B Predicted"
             )
         
         with col3:
@@ -175,7 +138,7 @@ if rfm_data is not None:
             avg_clv = rfm_data['Predicted_CLV'].mean()
             st.metric(
                 "Avg Customer CLV",
-                f"GH₵{avg_clv/1e6:.2f}M",
+                f"₵{avg_clv/1e6:.2f}M",
                 delta=f"{len(rfm_data[rfm_data['CLV_Category']=='Very High Value'])} VIP"
             )
         
@@ -204,7 +167,7 @@ if rfm_data is not None:
             
             st.markdown(f"""
             - **{len(critical_customers):,} HIGH-VALUE customers** at critical churn risk
-            - **GH₵{critical_customers['Monetary'].sum()/1e9:.2f}B revenue** at stake
+            - **₵{critical_customers['Monetary'].sum()/1e9:.2f}B revenue** at stake
             - **Immediate action required** for top 100 customers
             """)
             st.markdown('</div>', unsafe_allow_html=True)
@@ -216,8 +179,8 @@ if rfm_data is not None:
             champions = rfm_data[rfm_data['RFM_Segment'] == 'Champions']
             
             st.markdown(f"""
-            - **{len(champions):,} Champions** generating GH₵{champions['Monetary'].sum()/1e9:.2f}B
-            - **GH₵1.75B** potential from recommendations
+            - **{len(champions):,} Champions** generating ₵{champions['Monetary'].sum()/1e9:.2f}B
+            - **₵1.75B** potential from recommendations
             - **3,678 cross-sell** opportunities identified
             """)
             st.markdown('</div>', unsafe_allow_html=True)
@@ -230,74 +193,26 @@ if rfm_data is not None:
         with col1:
             st.markdown("#### 📊 Customer Distribution by RFM Segment")
             segment_counts = rfm_data['RFM_Segment'].value_counts()
-            fig_rfm = px.bar(
+            fig = px.bar(
                 x=segment_counts.values,
                 y=segment_counts.index,
                 orientation='h',
                 color=segment_counts.values,
                 color_continuous_scale='viridis'
             )
-            fig_rfm.update_layout(title="RFM Segment Distribution")
-            st.plotly_chart(fig_rfm, use_container_width=True, key="rfm_segment_chart")
-
-            if st.button("Get AI Summary", key="rfm_summary"):
-                with st.spinner("Analyzing chart..."):
-                    try:
-                        chart_data = {
-                            "chart_type": "segment_distribution",
-                            "data": {
-                                "labels": segment_counts.index.tolist(),
-                                "values": segment_counts.values.tolist()
-                            }
-                        }
-                        response = requests.post(
-                            "http://localhost:8000/analyze_chart/",
-                            json=chart_data
-                        )
-                        if response.status_code == 200:
-                            summary = response.json()["summary"]
-                            st.success("Chart Summary:")
-                            st.markdown(f"_{summary}_")
-                        else:
-                            st.error("Failed to generate chart summary. Please try again.")
-                    except Exception as e:
-                        st.error(f"Error connecting to AI service: {str(e)}")
+            fig.update_layout(showlegend=False, height=400)
+            st.plotly_chart(fig, width='stretch')
         
         with col2:
-            st.markdown("#### 💰 Revenue by RFM Segment")
-            segment_revenue = rfm_data.groupby('RFM_Segment')['Monetary'].sum().sort_values(ascending=True)
-            fig_revenue = px.bar(
-                x=segment_revenue.values,
-                y=segment_revenue.index,
-                orientation='h',
-                color=segment_revenue.values,
-                color_continuous_scale='viridis'
+            st.markdown("#### 💎 Revenue by Segment")
+            segment_revenue = rfm_data.groupby('RFM_Segment')['Monetary'].sum().sort_values(ascending=False)
+            fig = px.pie(
+                values=segment_revenue.values,
+                names=segment_revenue.index,
+                hole=0.4
             )
-            fig_revenue.update_layout(title="Revenue by RFM Segment")
-            st.plotly_chart(fig_revenue, use_container_width=True, key="revenue_segment_chart")
-
-            if st.button("Get AI Summary", key="revenue_summary"):
-                with st.spinner("Analyzing chart..."):
-                    try:
-                        chart_data = {
-                            "chart_type": "revenue_by_segment",
-                            "data": {
-                                "labels": segment_revenue.index.tolist(),
-                                "values": segment_revenue.values.tolist()
-                            }
-                        }
-                        response = requests.post(
-                            "http://localhost:8000/analyze_chart/",
-                            json=chart_data
-                        )
-                        if response.status_code == 200:
-                            summary = response.json()["summary"]
-                            st.success("Chart Summary:")
-                            st.markdown(f"_{summary}_")
-                        else:
-                            st.error("Failed to generate chart summary. Please try again.")
-                    except Exception as e:
-                        st.error(f"Error connecting to AI service: {str(e)}")
+            fig.update_layout(height=400)
+            st.plotly_chart(fig, width='stretch')
         
         # Charts Row 2
         col1, col2 = st.columns(2)
@@ -306,113 +221,39 @@ if rfm_data is not None:
             st.markdown("#### 🔥 Churn Risk Distribution")
             risk_counts = rfm_data['Churn_Risk_Level'].value_counts()
             colors = {'Low': '#28a745', 'Medium': '#ffc107', 'High': '#fd7e14', 'Critical': '#dc3545'}
-            fig_churn = go.Figure(data=[go.Bar(
+            fig = go.Figure(data=[go.Bar(
                 x=risk_counts.index,
                 y=risk_counts.values,
                 marker_color=[colors.get(x, '#6c757d') for x in risk_counts.index]
             )])
-            fig_churn.update_layout(
-                height=400,
-                title="Churn Risk Distribution"
-            )
-            st.plotly_chart(fig_churn, use_container_width=True, key="churn_risk_chart")
-
-            if st.button("Get AI Summary", key="churn_risk_summary"):
-                with st.spinner("Analyzing chart..."):
-                    try:
-                        chart_data = {
-                            "chart_type": "churn_risk_distribution",
-                            "data": {
-                                "labels": risk_counts.index.tolist(),
-                                "values": risk_counts.values.tolist()
-                            }
-                        }
-                        response = requests.post(
-                            "http://localhost:8000/analyze_chart/",
-                            json=chart_data
-                        )
-                        if response.status_code == 200:
-                            summary = response.json()["summary"]
-                            st.success("Chart Summary:")
-                            st.markdown(f"_{summary}_")
-                        else:
-                            st.error("Failed to generate chart summary. Please try again.")
-                    except Exception as e:
-                        st.error(f"Error connecting to AI service: {str(e)}")
+            fig.update_layout(height=400)
+            st.plotly_chart(fig, width='stretch')
         
         with col2:
-            st.markdown("#### 📈 Customer Lifetime Value Distribution")
-            fig_clv = px.histogram(
+            st.markdown("#### 📈 CLV Distribution")
+            fig = px.histogram(
                 rfm_data[rfm_data['Predicted_CLV'] > 0],
                 x='Predicted_CLV',
                 nbins=50,
                 color_discrete_sequence=['#2E86AB']
             )
-            fig_clv.update_layout(
-                title="CLV Distribution",
-                xaxis_title="Predicted Customer Lifetime Value (GH₵)",
-                yaxis_title="Number of Customers"
-            )
-            st.plotly_chart(fig_clv, use_container_width=True, key="clv_dist_chart")
-
-            if st.button("Get AI Summary", key="clv_dist_summary"):
-                with st.spinner("Analyzing chart..."):
-                    try:
-                        chart_data = {
-                            "chart_type": "clv_distribution",
-                            "data": {
-                                "values": rfm_data[rfm_data['Predicted_CLV'] > 0]['Predicted_CLV'].tolist()
-                            }
-                        }
-                        response = requests.post(
-                            "http://localhost:8000/analyze_chart/",
-                            json=chart_data
-                        )
-                        if response.status_code == 200:
-                            summary = response.json()["summary"]
-                            st.success("Chart Summary:")
-                            st.markdown(f"_{summary}_")
-                        else:
-                            st.error("Failed to generate chart summary. Please try again.")
-                    except Exception as e:
-                        st.error(f"Error connecting to AI service: {str(e)}")
+            fig.update_xaxes(type="log", title="Predicted CLV (₵, log scale)")
+            fig.update_layout(height=400, showlegend=False)
+            st.plotly_chart(fig, width='stretch')
         
         # Monthly Revenue Trend
         st.markdown("#### 📅 Monthly Revenue Trend")
         monthly_rev = transactions.groupby(transactions['Date'].dt.to_period('M'))['Revenue'].sum()
         monthly_rev.index = monthly_rev.index.to_timestamp()
         
-        fig_monthly = px.line(
+        fig = px.line(
             x=monthly_rev.index,
             y=monthly_rev.values,
-            labels={'x': 'Month', 'y': 'Revenue (GH₵)'}
+            labels={'x': 'Month', 'y': 'Revenue (₵)'}
         )
-        fig_monthly.update_traces(line_color='#2E86AB', line_width=3)
-        fig_monthly.update_layout(title="Monthly Revenue Trend")
-        st.plotly_chart(fig_monthly, use_container_width=True, key="monthly_revenue_chart")
-
-        if st.button("Get AI Summary", key="monthly_rev_summary"):
-            with st.spinner("Analyzing chart..."):
-                try:
-                    chart_data = {
-                        "chart_type": "monthly_revenue_trend",
-                        "data": {
-                            "x": monthly_rev.index.strftime('%Y-%m').tolist(),
-                            "y": monthly_rev.values.tolist()
-                        }
-                    }
-                    response = requests.post(
-                        "http://localhost:8000/analyze_chart/",
-                        json=chart_data
-                    )
-                    if response.status_code == 200:
-                        summary = response.json()["summary"]
-                        st.success("Chart Summary:")
-                        st.markdown(f"_{summary}_")
-                    else:
-                        st.error("Failed to generate chart summary. Please try again.")
-                except Exception as e:
-                    st.error(f"Error connecting to AI service: {str(e)}")
+        fig.update_traces(line_color='#2E86AB', line_width=3)
+        fig.update_layout(height=300)
+        st.plotly_chart(fig, width='stretch')
     
     elif page == "👥 Customer Segments":
         st.title("👥 Customer Segmentation Analysis")
@@ -440,12 +281,12 @@ if rfm_data is not None:
         segment_summary = segment_summary.sort_values('Total Revenue', ascending=False)
         
         st.dataframe(segment_summary.style.format({
-            'Total Revenue': 'GH₵{:,.0f}',
-            'Avg Revenue': 'GH₵{:,.0f}',
-            'Avg CLV': 'GH₵{:,.0f}',
+            'Total Revenue': '₵{:,.0f}',
+            'Avg Revenue': '₵{:,.0f}',
+            'Avg CLV': '₵{:,.0f}',
             'Avg Frequency': '{:.1f}',
             'Avg Recency': '{:.0f}'
-        }), use_container_width=True)
+        }), width='stretch')
         
         # Segment details
         st.markdown("---")
@@ -457,9 +298,9 @@ if rfm_data is not None:
         with col1:
             st.metric("Customers", f"{len(segment_data):,}")
         with col2:
-            st.metric("Total Revenue", f"GH₵{segment_data['Monetary'].sum()/1e6:.1f}M")
+            st.metric("Total Revenue", f"₵{segment_data['Monetary'].sum()/1e6:.1f}M")
         with col3:
-            st.metric("Avg CLV", f"GH₵{segment_data['Predicted_CLV'].mean()/1e6:.2f}M")
+            st.metric("Avg CLV", f"₵{segment_data['Predicted_CLV'].mean()/1e6:.2f}M")
         with col4:
             churn_pct = (segment_data['Churn_Probability'].mean()) * 100
             st.metric("Avg Churn Risk", f"{churn_pct:.1f}%")
@@ -471,13 +312,13 @@ if rfm_data is not None:
             st.markdown("#### Customer Type Distribution")
             type_dist = segment_data['Customer_Type'].value_counts()
             fig = px.pie(values=type_dist.values, names=type_dist.index)
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
         
         with col2:
             st.markdown("#### CLV Category Distribution")
             clv_dist = segment_data['CLV_Category'].value_counts()
             fig = px.bar(x=clv_dist.index, y=clv_dist.values)
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
     
     elif page == "🔮 Predictive Analytics":
         st.title("🔮 Predictive Analytics")
@@ -506,7 +347,7 @@ if rfm_data is not None:
                 nbins=50,
                 color_discrete_map={'Low': '#28a745', 'Medium': '#ffc107', 'High': '#fd7e14', 'Critical': '#dc3545'}
             )
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
             
             # High risk customers
             st.markdown("#### 🚨 Top 20 High-Risk Customers")
@@ -515,9 +356,9 @@ if rfm_data is not None:
             ].nlargest(20, 'Monetary')[['Customer_ID', 'RFM_Segment', 'Monetary', 'Churn_Probability', 'Churn_Risk_Level']]
             
             st.dataframe(high_risk_customers.style.format({
-                'Monetary': '₦{:,.0f}',
+                'Monetary': '₵{:,.0f}',
                 'Churn_Probability': '{:.2%}'
-            }), use_container_width=True)
+            }), width='stretch')
         
         with tab2:
             st.markdown("### Customer Lifetime Value Prediction")
@@ -527,28 +368,23 @@ if rfm_data is not None:
             with col1:
                 st.metric("Model R² Score", "0.896")
             with col2:
-                st.metric("Total Predicted CLV", f"GH₵{rfm_data['Predicted_CLV'].sum()/1e9:.2f}B")
+                st.metric("Total Predicted CLV", f"₵{rfm_data['Predicted_CLV'].sum()/1e9:.2f}B")
             with col3:
-                st.metric("Avg Predicted CLV", f"GH₵{rfm_data['Predicted_CLV'].mean()/1e6:.2f}M")
+                st.metric("Avg Predicted CLV", f"₵{rfm_data['Predicted_CLV'].mean()/1e6:.2f}M")
             
             # CLV scatter plot
             st.markdown("#### CLV vs Churn Risk Matrix")
-            # Prepare sample data with normalized size values
-            sample_data = rfm_data.sample(min(1000, len(rfm_data))).copy()
-            # Normalize Monetary values to a range between 10 and 100 for scatter plot size
-            sample_data['Size'] = 10 + 90 * (sample_data['Monetary'] - sample_data['Monetary'].min()) / (sample_data['Monetary'].max() - sample_data['Monetary'].min())
-            
             fig = px.scatter(
-                sample_data,
+                rfm_data.sample(min(1000, len(rfm_data))),
                 x='Churn_Probability',
                 y='Predicted_CLV',
                 color='Customer_Priority',
-                size='Size',  # Use normalized size values
-                hover_data=['Customer_ID', 'RFM_Segment', 'Monetary'],
+                size='Monetary',
+                hover_data=['Customer_ID', 'RFM_Segment'],
                 log_y=True
             )
             fig.add_vline(x=0.5, line_dash="dash", line_color="red", annotation_text="50% Churn Threshold")
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
             
             # Top CLV customers
             st.markdown("#### 💎 Top 20 High-Value Customers")
@@ -557,10 +393,10 @@ if rfm_data is not None:
             ]
             
             st.dataframe(top_clv.style.format({
-                'Monetary': '₦{:,.0f}',
-                'Predicted_CLV': '₦{:,.0f}',
+                'Monetary': '₵{:,.0f}',
+                'Predicted_CLV': '₵{:,.0f}',
                 'Churn_Probability': '{:.2%}'
-            }), use_container_width=True)
+            }), width='stretch')
         
         with tab3:
             st.markdown("### Purchase Timing Analysis")
@@ -571,7 +407,7 @@ if rfm_data is not None:
             col1, col2 = st.columns(2)
             with col1:
                 fig = px.pie(values=timing_dist.values, names=timing_dist.index, hole=0.4)
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width='stretch')
             
             with col2:
                 st.markdown("#### Purchase Status Breakdown")
@@ -587,10 +423,10 @@ if rfm_data is not None:
             
             if len(due_soon) > 0:
                 st.dataframe(due_soon.style.format({
-                    'Monetary': '₦{:,.0f}',
+                    'Monetary': '₵{:,.0f}',
                     'Days_Since_Last_Purchase': '{:.0f}',
                     'Expected_Days_to_Next_Purchase': '{:.0f}'
-                }), use_container_width=True)
+                }), width='stretch')
             else:
                 st.info("No customers identified as 'Due Soon' in current analysis.")
     
@@ -618,13 +454,13 @@ if rfm_data is not None:
                 st.markdown("#### Top Recommended Categories")
                 top_recs = recommendations['Recommended_Category'].value_counts().head(10)
                 fig = px.bar(x=top_recs.values, y=top_recs.index, orientation='h')
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width='stretch')
             
             with col2:
                 st.markdown("#### Recommendation Methods")
                 method_dist = recommendations['Reason'].value_counts()
                 fig = px.pie(values=method_dist.values, names=method_dist.index)
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width='stretch')
             
             # Customer-specific recommendations
             st.markdown("---")
@@ -639,9 +475,9 @@ if rfm_data is not None:
                 col1, col2, col3 = st.columns(3)
                 with col1:
                     st.markdown(f"**Segment:** {customer_info['RFM_Segment']}")
-                    st.markdown(f"**Total Spent:** GH₵{customer_info['Monetary']:,.0f}")
+                    st.markdown(f"**Total Spent:** ₵{customer_info['Monetary']:,.0f}")
                 with col2:
-                    st.markdown(f"**Predicted CLV:** GH₵{customer_info['Predicted_CLV']:,.0f}")
+                    st.markdown(f"**Predicted CLV:** ₵{customer_info['Predicted_CLV']:,.0f}")
                     st.markdown(f"**Churn Risk:** {customer_info['Churn_Probability']:.1%}")
                 with col3:
                     st.markdown(f"**Frequency:** {customer_info['Frequency']:.0f} purchases")
@@ -651,7 +487,7 @@ if rfm_data is not None:
                 if len(customer_recs) > 0:
                     st.dataframe(customer_recs[['Recommended_Category', 'Reason', 'Confidence']].style.format({
                         'Confidence': '{:.2f}'
-                    }), use_container_width=True)
+                    }), width='stretch')
                 else:
                     st.info("No recommendations available for this customer.")
         else:
@@ -677,10 +513,10 @@ if rfm_data is not None:
                     st.metric("RFM Segment", customer['RFM_Segment'])
                     st.metric("Customer Type", customer['Customer_Type'])
                 with col2:
-                    st.metric("Total Revenue", f"GH₵{customer['Monetary']:,.0f}")
+                    st.metric("Total Revenue", f"₵{customer['Monetary']:,.0f}")
                     st.metric("Frequency", f"{customer['Frequency']:.0f}")
                 with col3:
-                    st.metric("Predicted CLV", f"GH₵{customer['Predicted_CLV']:,.0f}")
+                    st.metric("Predicted CLV", f"₵{customer['Predicted_CLV']:,.0f}")
                     st.metric("Recency", f"{customer['Recency']:.0f} days")
                 with col4:
                     risk_color = "🔴" if customer['Churn_Risk_Level'] in ['High', 'Critical'] else "🟢"
@@ -701,7 +537,7 @@ if rfm_data is not None:
                 st.markdown("### Recommended Products")
                 customer_recs = recommendations[recommendations['Customer_ID'] == customer_id]
                 if len(customer_recs) > 0:
-                    st.dataframe(customer_recs[['Recommended_Category', 'Reason', 'Confidence']], use_container_width=True)
+                    st.dataframe(customer_recs[['Recommended_Category', 'Reason', 'Confidence']], width='stretch')
                 else:
                     st.info("No recommendations available.")
                 
@@ -733,12 +569,12 @@ if rfm_data is not None:
                            'Frequency', 'Recency', 'Churn_Probability', 'Churn_Risk_Level']
             
             st.dataframe(top_customers[display_cols].style.format({
-                'Monetary': 'GH₵{:,.0f}',
-                'Predicted_CLV': 'GH₵{:,.0f}',
+                'Monetary': '₵{:,.0f}',
+                'Predicted_CLV': '₵{:,.0f}',
                 'Churn_Probability': '{:.1%}',
                 'Frequency': '{:.0f}',
                 'Recency': '{:.0f}'
-            }), use_container_width=True)
+            }), width='stretch')
     
     elif page == "📈 Business Insights":
         st.title("📈 Business Insights & Recommendations")
@@ -748,10 +584,10 @@ if rfm_data is not None:
         st.markdown('<div class="success-box">', unsafe_allow_html=True)
         st.markdown("""
         ### 🎯 Key Achievements
-        - **Analyzed 3,122 customers** with GH₵3.24B in historical revenue
+        - **Analyzed 3,122 customers** with ₵3.24B in historical revenue
         - **Built 3 AI models** with 93.4% churn accuracy and 89.6% CLV accuracy
         - **Generated 4,984 personalized recommendations** across 1,000 customers
-        - **Identified GH₵3.0B+ revenue opportunity** through targeted interventions
+        - **Identified ₵3.0B+ revenue opportunity** through targeted interventions
         """)
         st.markdown('</div>', unsafe_allow_html=True)
         
@@ -759,7 +595,7 @@ if rfm_data is not None:
         st.markdown("""
         ### 🚨 Critical Issues
         - **87.2% churn rate** - Most customers inactive >90 days
-        - **GH₵1.81B at risk** - 1,359 high-value customers at critical churn risk
+        - **₵1.81B at risk** - 1,359 high-value customers at critical churn risk
         - **41.8% one-time buyers** - Poor repeat purchase rate
         - **5% active customers** - Only 156 customers purchased in last 30 days
         """)
@@ -768,18 +604,39 @@ if rfm_data is not None:
         st.markdown("---")
         
         st.markdown("## 💰 Revenue Opportunities")
-
-        if st.button("Generate Recommendations"):
-            with st.spinner("Generating recommendations..."):
-                try:
-                    response = requests.get("http://localhost:8000/generate_recommendations/")
-                    if response.status_code == 200:
-                        recommendations = response.json()["recommendations"]
-                        st.dataframe(pd.DataFrame(recommendations), use_container_width=True)
-                    else:
-                        st.error("Failed to generate recommendations. Please try again.")
-                except Exception as e:
-                    st.error(f"Error connecting to AI service: {str(e)}")
+        
+        opportunities = pd.DataFrame({
+            'Initiative': [
+                'Save High-Risk VIPs',
+                'Protect Champions',
+                'Cross-Sell Equipment',
+                'Fruit/Vegetable Expansion',
+                'CLV Optimization'
+            ],
+            'Target': [
+                '1,359 customers',
+                '615 Champions',
+                '2,800+ customers',
+                '2,500+ recommendations',
+                'All segments'
+            ],
+            'Potential Revenue': [
+                '₵543M',
+                '₵2.1B retained',
+                '₵420M',
+                '₵250M',
+                '₵300M'
+            ],
+            'Timeline': [
+                '90 days',
+                'Ongoing',
+                '6 months',
+                '12 months',
+                '12 months'
+            ]
+        })
+        
+        st.dataframe(opportunities, width='stretch')
         
         st.markdown("---")
         
@@ -856,11 +713,11 @@ if rfm_data is not None:
         with col1:
             impact_data = pd.DataFrame({
                 'Metric': ['Churn Rate', 'Active Customers', 'Revenue', 'Avg Customer Value'],
-                'Current': ['87.2%', '399 (12.8%)', 'GH₵3.24B', 'GH₵1.04M'],
-                'Target (12M)': ['65%', '1,100+ (35%)', 'GH₵4.0B+', 'GH₵1.30M'],
+                'Current': ['87.2%', '399 (12.8%)', '₵3.24B', '₵1.04M'],
+                'Target (12M)': ['65%', '1,100+ (35%)', '₵4.0B+', '₵1.30M'],
                 'Improvement': ['-22.2%', '+175%', '+23%', '+25%']
             })
-            st.dataframe(impact_data, use_container_width=True)
+            st.dataframe(impact_data, width='stretch')
         
         with col2:
             st.markdown("""
@@ -872,106 +729,6 @@ if rfm_data is not None:
             - **20% boost** in customer lifetime value
             - **15-20x ROI** on segmentation strategy
             """)
-
-    elif page == "🤖 AI Insight Engine":
-        st.title("🤖 AI Insight Engine")
-        
-        # Create tabs for different AI features
-        ai_tab1, ai_tab2, ai_tab3 = st.tabs(["💬 Ask Questions", "🔍 Automated Insights", "📊 Chart Summaries"])
-        
-        with ai_tab1:
-            st.markdown("### Ask questions about your data in plain English")
-            st.markdown("""
-            **Example questions you can ask:**
-            - Which customer segment has the highest churn rate?
-            - What's the total revenue trend over the last month?
-            - Show me the distribution of customer segments
-            - What's the average transaction value?
-            """)
-            
-            user_question = st.text_input("Your Question", key="user_question")
-            
-            if st.button("Get Insight", key="get_insight"):
-                if user_question:
-                    with st.spinner("Analyzing your question..."):
-                        try:
-                            response = requests.post(
-                                "http://localhost:8000/get_insight/",
-                                json={"question": user_question}
-                            )
-                            if response.status_code == 200:
-                                insight = response.json()["insight"]
-                                st.success("AI Response:")
-                                st.markdown(f"_{insight}_")
-                            else:
-                                st.error("Failed to get insight. Please try again.")
-                        except Exception as e:
-                            st.error(f"Error connecting to AI service: {str(e)}")
-                else:
-                    st.warning("Please enter a question first.")
-        
-        with ai_tab2:
-            st.markdown("### Automated Data Insights")
-            st.markdown("Real-time analysis of your customer data")
-            
-            if st.button("Generate Insights", key="generate_insights"):
-                with st.spinner("Analyzing data..."):
-                    try:
-                        response = requests.get("http://localhost:8000/automated_insights/")
-                        if response.status_code == 200:
-                            insights = response.json()["insights"]
-                            for insight in insights:
-                                if insight["type"] == "risk_alert":
-                                    st.error(f"🚨 {insight['title']}")
-                                    st.markdown(insight["description"])
-                                elif insight["type"] == "revenue_trend":
-                                    st.info(f"📈 {insight['title']}")
-                                    st.markdown(insight["description"])
-                                st.markdown("---")
-                        else:
-                            st.error("Failed to generate insights. Please try again.")
-                    except Exception as e:
-                        st.error(f"Error connecting to AI service: {str(e)}")
-        
-        with ai_tab3:
-            st.markdown("### Chart & Visualization Summaries")
-            st.markdown("Get AI-powered explanations of any chart in the dashboard")
-            
-            # Example chart for demonstration
-            segment_data = rfm_data['RFM_Segment'].value_counts()
-            fig = px.pie(
-                names=segment_data.index,
-                values=segment_data.values,
-                title="Customer Segment Distribution"
-            )
-            st.plotly_chart(fig, use_container_width=True)
-            
-            if st.button("Get Chart Summary", key="get_chart_summary"):
-                with st.spinner("Analyzing chart..."):
-                    try:
-                        chart_data = {
-                            "chart_type": "segment_distribution",
-                            "data": {
-                                "labels": segment_data.index.tolist(),
-                                "values": segment_data.values.tolist()
-                            }
-                        }
-                        response = requests.post(
-                            "http://localhost:8000/analyze_chart/",
-                            json=chart_data
-                        )
-                        if response.status_code == 200:
-                            summary = response.json()["summary"]
-                            st.success("Chart Summary:")
-                            st.markdown(f"_{summary}_")
-                        else:
-                            st.error("Failed to generate chart summary. Please try again.")
-                    except Exception as e:
-                        st.error(f"Error connecting to AI service: {str(e)}")
-                        
-                st.warning("AI response generation is not yet implemented.")
-            else:
-                st.warning("Please enter a question.")
 
 else:
     st.error("Failed to load data. Please check data files.")
