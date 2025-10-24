@@ -1,0 +1,3 @@
+Model,Accuracy/R²,Training_Samples,Test_Samples,Features_Used
+Churn Prediction (Gradient Boosting),0.979 (AUC-ROC),2497,625,12
+CLV Prediction (Gradient Boosting/RF),0.896 (R²),2480,621,12

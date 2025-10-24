@@ -1,0 +1,11 @@
+Metric,Value
+Total Customers Analyzed,"3,122"
+Customers with Recommendations,"1,000"
+Total Recommendations Generated,"4,984"
+Avg Recommendations per Customer,5.0
+Unique Categories Recommended,10
+Avg Recommendation Confidence,0.50
+High Confidence Recs (>0.7),"1,346 (27.0%)"
+Cross-sell Opportunities,"3,678"
+Product Association Rules,44
+Top Recommended Category,Equipment

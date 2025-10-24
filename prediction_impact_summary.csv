@@ -1,0 +1,10 @@
+Metric,Value
+Total Customers Analyzed,"3,122"
+Churned Customers (>90 days),"2,723 (87.2%)"
+High/Critical Churn Risk,"2,674"
+High-Value At Risk (>₦100K),"1,359"
+Average Predicted CLV,"₦1,042,462.74"
+Total Predicted CLV,"₦3,254,568,666.82"
+Very High Priority Customers,625
+Customers Due for Purchase,89
+Action Required Customers,"1,403"
