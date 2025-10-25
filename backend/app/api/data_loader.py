@@ -43,7 +43,7 @@ class DataLoader:
     def get_rfm_data(self) -> pd.DataFrame:
         """Load and cache RFM data with predictions"""
         if self._rfm_data is None:
-            file_path = self.data_dir / '/data/procesed/rfm_with_predictions.csv'
+            file_path = self.data_dir / 'rfm_with_predictions.csv'
             logger.info(f"Loading RFM data from {file_path}")
             
             try:
@@ -61,7 +61,7 @@ class DataLoader:
     def get_transactions(self) -> pd.DataFrame:
         """Load and cache transaction data"""
         if self._transactions is None:
-            file_path = self.data_dir / '/data/procesed/transactions_clean.csv'
+            file_path = self.data_dir / 'transactions_clean.csv'
             logger.info(f"Loading transaction data from {file_path}")
             
             try:
@@ -80,7 +80,7 @@ class DataLoader:
     def get_recommendations(self) -> pd.DataFrame:
         """Load and cache product recommendations"""
         if self._recommendations is None:
-            file_path = self.data_dir / '/data/procesed/product_recommendations.csv'
+            file_path = self.data_dir / 'product_recommendations.csv'
             logger.info(f"Loading recommendations from {file_path}")
             
             try:

@@ -23,7 +23,9 @@ from .models import (
 )
 from .data_loader import DataLoader
 from .analytics import AnalyticsService
+import logging
 
+logger = logging.getLogger(__name__)
 # Initialize FastAPI app
 app = FastAPI(
     title="Afrimash Customer Intelligence API",
@@ -34,14 +36,16 @@ app = FastAPI(
 # Configure CORS for React frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:5173"],  # React default ports
+    # allow_origins=["http://localhost:3000", "http://localhost:5173"],  # React default ports
+    allow_origins=["*"],  # React default ports
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # Initialize data loader and analytics service
-data_loader = DataLoader()
+data_loader = DataLoader(f"{Path(__file__).parent.parent.parent.parent}/data/processed")
+print(f"Data loader initialized with data directory: {data_loader.data_dir}")
 analytics = AnalyticsService()
 
 
