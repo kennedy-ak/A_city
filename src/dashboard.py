@@ -93,21 +93,21 @@ st.markdown("""
 @st.cache_data
 def load_data():
     try:
-        rfm_data = pd.read_csv('rfm_with_predictions.csv')
-        transactions = pd.read_csv('transactions_clean.csv')
-        recommendations = pd.read_csv('product_recommendations.csv')
+        rfm_data = pd.read_csv('../data/processed/rfm_with_predictions.csv')
+        transactions = pd.read_csv('../data/processed/transactions_clean.csv')
+        recommendations = pd.read_csv('../data/processed/product_recommendations.csv')
         
         # Parse dates
         transactions['Date'] = pd.to_datetime(transactions['Date'])
         
         # Try to load optional files
         try:
-            cross_sell = pd.read_csv('cross_sell_opportunities.csv')
+            cross_sell = pd.read_csv('../data/processed/cross_sell_opportunities.csv')
         except:
             cross_sell = None
 
         try:
-            high_risk = pd.read_csv('high_risk_customers.csv')
+            high_risk = pd.read_csv('../data/processed/high_risk_customers.csv')
         except:
             high_risk = None
 
@@ -128,7 +128,7 @@ if rfm_data is not None:
     page = st.sidebar.radio(
         "Select View",
         ["📊 Executive Dashboard", "👥 Customer Segments", "🔮 Predictive Analytics", 
-         "🎯 Recommendations", "🔍 Customer Search", "📈 Business Insights", "🤖 AI Insight Engine"]
+         "🎯 Recommendations", "🔍 Customer Search", "📈 Business Insights", "🤖 AI Insight Engine", "🚀 Implementation Roadmap"]
     )
     
     st.sidebar.markdown("---")
@@ -445,7 +445,7 @@ if rfm_data is not None:
             'Avg CLV': 'GH₵{:,.0f}',
             'Avg Frequency': '{:.1f}',
             'Avg Recency': '{:.0f}'
-        }), use_container_width=True)
+        }), width='stretch')
         
         # Segment details
         st.markdown("---")
@@ -471,18 +471,96 @@ if rfm_data is not None:
             st.markdown("#### Customer Type Distribution")
             type_dist = segment_data['Customer_Type'].value_counts()
             fig = px.pie(values=type_dist.values, names=type_dist.index)
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, use_container_width=True, key="segment_pie_chart")
         
         with col2:
             st.markdown("#### CLV Category Distribution")
             clv_dist = segment_data['CLV_Category'].value_counts()
             fig = px.bar(x=clv_dist.index, y=clv_dist.values)
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, use_container_width=True, key="clv_dist_chart")
     
     elif page == "🔮 Predictive Analytics":
         st.title("🔮 Predictive Analytics")
         
         tab1, tab2, tab3 = st.tabs(["Churn Prediction", "CLV Prediction", "Purchase Timing"])
+        
+    elif page == "🎯 Recommendations":
+        st.title("🎯 Product Recommendations")
+        
+        if recommendations is not None and len(recommendations) > 0:
+            # Summary metrics
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.metric("Total Recommendations", f"{len(recommendations):,}")
+            with col2:
+                st.metric("Customers Covered", f"{recommendations['Customer_ID'].nunique():,}")
+            with col3:
+                st.metric("Avg Confidence", f"{recommendations['Confidence'].mean():.2f}")
+            with col4:
+                high_conf = len(recommendations[recommendations['Confidence'] > 0.7])
+                st.metric("High Confidence (>0.7)", f"{high_conf:,}")
+            
+            st.markdown("---")
+            
+            # Top recommended categories
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.markdown("#### Top Recommended Categories")
+                top_recs = recommendations['Recommended_Category'].value_counts().head(10)
+                fig = px.bar(x=top_recs.values, y=top_recs.index, orientation='h',
+                            title="Most Frequently Recommended Categories",
+                            labels={'x': 'Number of Recommendations', 'y': 'Category'})
+                st.plotly_chart(fig, width='stretch', key="top_categories_chart")
+            
+            with col2:
+                st.markdown("#### Recommendation Methods")
+                method_dist = recommendations['Reason'].value_counts()
+                fig = px.pie(values=method_dist.values, names=method_dist.index,
+                           title="Distribution of Recommendation Methods")
+                st.plotly_chart(fig, width='stretch', key="recommendation_methods_chart")
+            
+            # Customer-specific recommendations
+            st.markdown("---")
+            st.markdown("### Get Recommendations for Specific Customer")
+            
+            customer_id = st.selectbox("Select Customer ID", sorted(rfm_data['Customer_ID'].unique()))
+            
+            if customer_id:
+                customer_recs = recommendations[recommendations['Customer_ID'] == customer_id]
+                customer_info = rfm_data[rfm_data['Customer_ID'] == customer_id].iloc[0]
+                
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.markdown(f"**Segment:** {customer_info['RFM_Segment']}")
+                    st.markdown(f"**Total Spent:** GH₵{customer_info['Monetary']:,.0f}")
+                with col2:
+                    st.markdown(f"**Predicted CLV:** GH₵{customer_info['Predicted_CLV']:,.0f}")
+                    st.markdown(f"**Churn Risk:** {customer_info['Churn_Probability']:.1%}")
+                with col3:
+                    st.markdown(f"**Frequency:** {customer_info['Frequency']:.0f} purchases")
+                    st.markdown(f"**Recency:** {customer_info['Recency']:.0f} days")
+                
+                st.markdown("#### Recommended Products")
+                if len(customer_recs) > 0:
+                    # Add confidence color coding
+                    def color_confidence(val):
+                        if val >= 0.7:
+                            return 'background-color: #28a745; color: white'
+                        elif val >= 0.4:
+                            return 'background-color: #ffc107'
+                        else:
+                            return 'background-color: #dc3545; color: white'
+                    
+                    styled_recs = customer_recs[['Recommended_Category', 'Reason', 'Confidence']].style\
+                        .format({'Confidence': '{:.2f}'})\
+                        .applymap(color_confidence, subset=['Confidence'])
+                    
+                    st.dataframe(styled_recs, width='stretch')
+                else:
+                    st.info("No recommendations available for this customer.")
+        else:
+            st.warning("Recommendation data not available.")
         
         with tab1:
             st.markdown("### Churn Prediction Analysis")
@@ -506,7 +584,7 @@ if rfm_data is not None:
                 nbins=50,
                 color_discrete_map={'Low': '#28a745', 'Medium': '#ffc107', 'High': '#fd7e14', 'Critical': '#dc3545'}
             )
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, use_container_width=True, key="churn_dist_chart")
             
             # High risk customers
             st.markdown("#### 🚨 Top 20 High-Risk Customers")
@@ -571,7 +649,7 @@ if rfm_data is not None:
             col1, col2 = st.columns(2)
             with col1:
                 fig = px.pie(values=timing_dist.values, names=timing_dist.index, hole=0.4)
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, use_container_width=True, key="timing_dist_chart")
             
             with col2:
                 st.markdown("#### Purchase Status Breakdown")
@@ -701,7 +779,7 @@ if rfm_data is not None:
                 st.markdown("### Recommended Products")
                 customer_recs = recommendations[recommendations['Customer_ID'] == customer_id]
                 if len(customer_recs) > 0:
-                    st.dataframe(customer_recs[['Recommended_Category', 'Reason', 'Confidence']], use_container_width=True)
+                    st.dataframe(customer_recs[['Recommended_Category', 'Reason', 'Confidence']], width='stretch')
                 else:
                     st.info("No recommendations available.")
                 
@@ -944,7 +1022,7 @@ if rfm_data is not None:
                 values=segment_data.values,
                 title="Customer Segment Distribution"
             )
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, use_container_width=True, key="chart_with_ai_summary")
             
             if st.button("Get Chart Summary", key="get_chart_summary"):
                 with st.spinner("Analyzing chart..."):
@@ -973,6 +1051,111 @@ if rfm_data is not None:
             else:
                 st.warning("Please enter a question.")
 
+    elif page == "🚀 Implementation Roadmap":
+        st.title("🚀 Implementation Roadmap & Architecture")
+
+        st.markdown("## 🏗️ Implementation Architecture")
+        st.markdown("### System Components")
+        st.code("""
+┌─────────────────────────────────────────────────────────────┐
+│                    DATA LAYER                                │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐         │
+│  │ Transaction │  │     RFM     │  │  Customer   │         │
+│  │    Data     │──│    Data     │──│   Master    │         │
+│  └─────────────┘  └─────────────┘  └─────────────┘         │
+└─────────────────────────────────────────────────────────────┘
+                           ↓
+┌─────────────────────────────────────────────────────────────┐
+│                  PROCESSING LAYER                            │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐         │
+│  │   Feature   │  │    ML       │  │   Business  │         │
+│  │ Engineering │──│   Models    │──│    Rules    │         │
+│  └─────────────┘  └─────────────┘  └─────────────┘         │
+└─────────────────────────────────────────────────────────────┘
+                           ↓
+┌─────────────────────────────────────────────────────────────┐
+│                   MODEL LAYER                                │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐         │
+│  │    Churn    │  │     CLV     │  │Recommenda-  │         │
+│  │  Prediction │  │  Prediction │  │    tion     │         │
+│  └─────────────┘  └─────────────┘  └─────────────┘         │
+└─────────────────────────────────────────────────────────────┘
+                           ↓
+┌─────────────────────────────────────────────────────────────┐
+│                APPLICATION LAYER                             │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐         │
+│  │  Streamlit  │  │     API     │  │     CRM     │         │
+│  │  Dashboard  │  │   Service   │  │ Integration │         │
+│  └─────────────┘  └─────────────┘  └─────────────┘         │
+└─────────────────────────────────────────────────────────────┘
+                           ↓
+┌─────────────────────────────────────────────────────────────┐
+│                   OUTPUT LAYER                               │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐         │
+│  │   Sales     │  │  Marketing  │  │  Executive  │         │
+│  │    Team     │  │  Campaigns  │  │   Reports   │         │
+│  └─────────────┘  └─────────────┘  └─────────────┘         │
+└─────────────────────────────────────────────────────────────┘
+""", language='text')
+
+        st.markdown("### Deployment Options")
+        st.markdown("#### Option 1: Cloud Deployment (Recommended)")
+        st.markdown("""
+        - **Platform:** AWS / Google Cloud / Azure
+        - **Components:**
+          - Database: PostgreSQL / MongoDB
+          - Application: Streamlit Cloud / AWS Elastic Beanstalk
+          - ML Models: SageMaker / Vertex AI
+          - Scheduler: Airflow for daily model refresh
+        - **Cost:** ~$500-1,000/month
+        - **Timeline:** 2-4 weeks
+        """)
+        st.markdown("#### Option 2: On-Premise Deployment")
+        st.markdown("""
+        - **Requirements:**
+          - Server: 8 CPU cores, 32GB RAM
+          - Storage: 500GB SSD
+          - OS: Ubuntu 22.04 LTS
+        - **Components:**
+          - Docker containers for isolation
+          - PostgreSQL for data storage
+          - Nginx for web serving
+        - **Cost:** Hardware + maintenance
+        - **Timeline:** 4-6 weeks
+        """)
+
+        st.markdown("---")
+        st.markdown("## 💡 Business Recommendations")
+        st.markdown("### PHASE 1: EMERGENCY RESPONSE (Week 1)")
+        st.markdown("""
+        #### 🚨 Priority 1: Save High-Value At-Risk Customers
+        **Target:** 1,359 customers with >₦100K value at critical risk
+        **Actions:**
+        - Personal phone calls from senior sales team
+        - Exclusive 15-20% discount codes (1-time use)
+        - Satisfaction survey to understand issues
+        - Fast-track order processing
+        - Assign dedicated account managers
+        **Expected Impact:** Save 30% = 408 customers = ₦543M revenue
+        """)
+        st.markdown("### PHASE 2: SCALE & OPTIMIZE (Month 1)")
+        st.markdown("""
+        #### 📧 Automated Campaigns
+        - Churn risk alerts (daily monitoring)
+        - Personalized recommendation emails (weekly)
+        - Re-engagement campaigns (segment-specific)
+        - Due-soon reminders (automated triggers)
+        """)
+        st.markdown("### PHASE 3: FULL IMPLEMENTATION (Quarter 1)")
+        st.markdown("""
+        #### 🤖 AI Integration
+        - Real-time churn predictions
+        - Automated customer scoring
+        - Dynamic pricing based on CLV
+        - Predictive inventory management
+        """)
+
+
 else:
     st.error("Failed to load data. Please check data files.")
 
@@ -981,6 +1164,6 @@ st.markdown("---")
 st.markdown("""
 <div style='text-align: center; color: #6c757d;'>
     <p>Afrimash Customer Intelligence Dashboard | Powered by AI & Machine Learning</p>
-    <p>Data as of October 2025 | Built with Streamlit</p>
+    <p>Data as of October 2025 | Built By Team Titan</p>
 </div>
 """, unsafe_allow_html=True)

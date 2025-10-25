@@ -2,6 +2,8 @@
 fastapi
 uvicorn
 streamlit
+dash
+dash-bootstrap-components
 
 # Data Processing
 pandas
