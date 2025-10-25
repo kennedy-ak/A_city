@@ -67,9 +67,9 @@ st.markdown("""
 @st.cache_data
 def load_data():
     try:
-        rfm_data = pd.read_csv('/home/claude/rfm_with_predictions.csv')
-        transactions = pd.read_csv('/home/claude/transactions_clean.csv')
-        recommendations = pd.read_csv('/home/claude/product_recommendations.csv')
+        rfm_data = pd.read_csv('rfm_with_predictions.csv')
+        transactions = pd.read_csv('transactions_clean.csv')
+        recommendations = pd.read_csv('product_recommendations.csv')
         
         # Parse dates
         transactions['Date'] = pd.to_datetime(transactions['Date'])
