@@ -40,17 +40,30 @@ app.add_middleware(
 # Configure Gemini AI
 def setup_gemini():
     """Initialize Gemini AI model"""
-    load_dotenv()
-    api_key = os.getenv("GEMINI_API_KEY")
+    try:
+        load_dotenv()
+        api_key = "AIzaSyAYQa3EftKZrWWJBf_mIQUfBtJvku9QTnQ"
 
-    if not api_key:
+        if not api_key:
+            raise HTTPException(
+                status_code=500,
+                detail="GEMINI_API_KEY not found in environment variables. Please add it to your .env file."
+            )
+
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel('gemini-2.5-pro')
+        
+        # Test the model with a simple prompt to verify it's working
+        test_response = model.generate_content("Respond with 'OK' if you can understand this.")
+        if not test_response or not test_response.text:
+            raise Exception("Failed to get response from Gemini model")
+            
+        return model
+    except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail="GEMINI_API_KEY not found in environment variables. Please add it to your .env file."
+            detail=f"Failed to initialize Gemini model: {str(e)}"
         )
-
-    genai.configure(api_key=api_key)
-    return genai.GenerativeModel('gemini-pro')
 
 # Load customer data
 def load_data():
@@ -95,6 +108,7 @@ async def root():
 async def get_insight(query: Query):
     """Process natural language questions about customer data"""
     try:
+        # Load data and setup model
         data = load_data()
         model = setup_gemini()
 
@@ -111,24 +125,56 @@ async def get_insight(query: Query):
 
         Top Risk Levels:
         {data['rfm_data']['Churn_Risk_Level'].value_counts().to_dict()}
+
+        Additional Metrics:
+        - Active Customers: {len(data['rfm_data'][data['rfm_data']['Is_Churned'] == 0]):,}
+        - High Value Customers: {len(data['rfm_data'][data['rfm_data']['CLV_Category'] == 'Very High Value']):,}
+        - Recent Purchases (Last 30 days): {len(data['rfm_data'][data['rfm_data']['Recency'] <= 30]):,}
         """
 
-        # Create prompt for Gemini
+        # Create detailed prompt for Gemini
         prompt = f"""
-        You are an expert data analyst for Afrimash, an agricultural marketplace.
+        You are an expert data analyst for Afrimash, an agricultural marketplace. Analyze the following data and provide strategic insights.
 
         {rfm_summary}
 
         User Question: {query.question}
 
-        Provide a clear, actionable answer based on the data. Include specific numbers and recommendations.
-        Keep the response concise (2-3 paragraphs max).
+        Requirements for your response:
+        1. Provide clear, data-driven insights
+        2. Include specific numbers and percentages
+        3. Offer actionable recommendations
+        4. Focus on business impact and ROI
+        5. Keep the response concise (2-3 paragraphs)
+        6. Highlight any urgent issues or opportunities
+        
+        Format your response with:
+        - Key Insight:
+        - Supporting Data:
+        - Recommendations:
         """
 
-        # Get response from Gemini
-        response = model.generate_content(prompt)
-
-        return {"insight": response.text}
+        # Get response from Gemini with safety checks
+        try:
+            response = model.generate_content(prompt)
+            if not response or not response.text:
+                raise Exception("Empty response from Gemini")
+                
+            # Clean and format the response
+            insight_text = response.text.strip()
+            if len(insight_text) < 10:  # Basic validation
+                raise Exception("Response too short or invalid")
+                
+            return {
+                "insight": insight_text,
+                "status": "success",
+                "timestamp": pd.Timestamp.now().isoformat()
+            }
+        except Exception as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error processing Gemini response: {str(e)}"
+            )
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating insight: {str(e)}")
@@ -138,11 +184,19 @@ async def analyze_chart(chart_data: ChartData):
     """Generate AI summary for visualizations"""
     try:
         model = setup_gemini()
+        if not model:
+            raise HTTPException(status_code=500, detail="Failed to initialize Gemini model")
+
+        if not chart_data or not chart_data.chart_type:
+            raise HTTPException(status_code=400, detail="Invalid chart data provided")
 
         # Create prompt based on chart type
         if chart_data.chart_type == "segment_distribution":
             labels = chart_data.data.get('labels', [])
             values = chart_data.data.get('values', [])
+            
+            if not labels or not values or len(labels) != len(values):
+                raise HTTPException(status_code=400, detail="Invalid segment distribution data")
 
             data_text = "\n".join([f"- {label}: {value:,} customers" for label, value in zip(labels, values)])
 

@@ -235,6 +235,7 @@ if rfm_data is not None:
             "📊 Advanced Analytics",
             "👥 Customer Segments",
             "🔮 Predictive Models",
+            "🎯 Model Comparison",
             "🎯 Recommendations",
             "🔍 Customer Search",
             "💹 Cohort & Retention",
@@ -290,8 +291,8 @@ if rfm_data is not None:
     st.sidebar.info(f"""
     **Filtered Data:**
     - Customers: {len(filtered_rfm):,}
-    - Revenue: ₦{filtered_rfm['Monetary'].sum()/1e9:.2f}B
-    - Avg CLV: ₦{filtered_rfm['Predicted_CLV'].mean()/1e6:.2f}M
+    - Revenue: GH₵{filtered_rfm['Monetary'].sum()/1e9:.2f}B
+    - Avg CLV: GH₵{filtered_rfm['Predicted_CLV'].mean()/1e6:.2f}M
 
     **Analysis Date:** {datetime.now().strftime('%Y-%m-%d')}
     """)
@@ -340,8 +341,8 @@ if rfm_data is not None:
             predicted_clv = filtered_rfm['Predicted_CLV'].sum()
             st.metric(
                 "💰 Total Revenue",
-                f"₦{total_revenue/1e9:.2f}B",
-                delta=f"₦{predicted_clv/1e9:.2f}B CLV",
+                f"GH₵{total_revenue/1e9:.2f}B",
+                delta=f"GH₵{predicted_clv/1e9:.2f}B CLV",
                 delta_color="normal"
             )
 
@@ -359,7 +360,7 @@ if rfm_data is not None:
             high_value = len(filtered_rfm[filtered_rfm['CLV_Category'] == 'Very High Value'])
             st.metric(
                 "💎 Avg CLV",
-                f"₦{avg_clv/1e6:.2f}M",
+                f"GH₵{avg_clv/1e6:.2f}M",
                 delta=f"{high_value:,} VIPs",
                 delta_color="normal"
             )
@@ -370,7 +371,7 @@ if rfm_data is not None:
             st.metric(
                 "🚨 At Risk",
                 f"{high_risk_count:,}",
-                delta=f"₦{risk_revenue/1e9:.2f}B at Stake",
+                delta=f"GH₵{risk_revenue/1e9:.2f}B at Stake",
                 delta_color="inverse"
             )
 
@@ -390,9 +391,9 @@ if rfm_data is not None:
 
             st.markdown(f"""
             - **{len(critical_customers):,} HIGH-VALUE customers** at critical churn risk
-            - **₦{critical_customers['Monetary'].sum()/1e9:.2f}B revenue** at immediate risk
+            - **GH₵{critical_customers['Monetary'].sum()/1e9:.2f}B revenue** at immediate risk
             - **Top {min(20, len(critical_customers))} require URGENT action** within 48 hours
-            - **Estimated loss:** ₦{critical_customers['Predicted_CLV'].sum()/1e9:.2f}B lifetime value
+            - **Estimated loss:** GH₵{critical_customers['Predicted_CLV'].sum()/1e9:.2f}B lifetime value
             """)
             st.markdown('</div>', unsafe_allow_html=True)
 
@@ -403,9 +404,9 @@ if rfm_data is not None:
             champions = filtered_rfm[filtered_rfm['RFM_Segment'] == 'Champions']
 
             st.markdown(f"""
-            - **{len(champions):,} Champions** generating ₦{champions['Monetary'].sum()/1e9:.2f}B
+            - **{len(champions):,} Champions** generating GH₵{champions['Monetary'].sum()/1e9:.2f}B
             - **{len(recommendations):,} recommendations** across {recommendations['Customer_ID'].nunique():,} customers
-            - **₦{champions['Predicted_CLV'].sum()/1e9:.2f}B potential CLV** from Champions
+            - **GH₵{champions['Predicted_CLV'].sum()/1e9:.2f}B potential CLV** from Champions
             - **{len(filtered_rfm[filtered_rfm['Purchase_Timing_Status'] == 'Due Soon']):,} customers** ready to purchase
             """)
             st.markdown('</div>', unsafe_allow_html=True)
@@ -554,7 +555,7 @@ if rfm_data is not None:
         fig.update_layout(
             title="Monthly Revenue Trend with Moving Average",
             xaxis_title="Month",
-            yaxis_title="Revenue (₦)",
+            yaxis_title="Revenue (GH₵)",
             hovermode='x unified',
             height=400
         )
@@ -638,19 +639,21 @@ if rfm_data is not None:
                 )
                 st.markdown("**Revenue Trend**")
                 st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
-                st.metric("Total Revenue", f"₦{filtered_rfm['Monetary'].sum()/1e9:.2f}B")
+                st.metric("Total Revenue", f"GH₵{filtered_rfm['Monetary'].sum()/1e9:.2f}B")
 
             with col3:
                 # Churn trend
+                current_churn_rate = (filtered_rfm['Is_Churned'].sum() / len(filtered_rfm)) * 100
+
                 if 'Date' in filtered_rfm.columns:
                     churn_trend = filtered_rfm.groupby(pd.Grouper(key='Date', freq='M'))['Is_Churned'].mean() * 100
                 else:
-                    churn_trend = pd.Series([churn_rate] * 12)
+                    churn_trend = pd.Series([current_churn_rate] * 12)
 
                 fig = go.Figure()
                 fig.add_trace(go.Scatter(
                     x=list(range(len(churn_trend))),
-                    y=churn_trend.values if hasattr(churn_trend, 'values') else [churn_rate] * 12,
+                    y=churn_trend.values if hasattr(churn_trend, 'values') else [current_churn_rate] * 12,
                     mode='lines',
                     fill='tozeroy',
                     line=dict(color='#dc3545', width=2)
@@ -685,7 +688,7 @@ if rfm_data is not None:
                     )
                     st.markdown("**CLV by Segment**")
                     st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
-                    st.metric("Avg CLV", f"₦{filtered_rfm['Predicted_CLV'].mean()/1e6:.2f}M")
+                    st.metric("Avg CLV", f"GH₵{filtered_rfm['Predicted_CLV'].mean()/1e6:.2f}M")
 
             st.markdown("---")
 
@@ -718,11 +721,11 @@ if rfm_data is not None:
             # Display with formatting
             st.dataframe(
                 segment_metrics.style.format({
-                    'Total Revenue': '₦{:,.0f}',
-                    'Avg Revenue': '₦{:,.0f}',
-                    'Median Revenue': '₦{:,.0f}',
-                    'Avg CLV': '₦{:,.0f}',
-                    'Total CLV': '₦{:,.0f}',
+                    'Total Revenue': 'GH₵{:,.0f}',
+                    'Avg Revenue': 'GH₵{:,.0f}',
+                    'Median Revenue': 'GH₵{:,.0f}',
+                    'Avg CLV': 'GH₵{:,.0f}',
+                    'Total CLV': 'GH₵{:,.0f}',
                     'Avg Churn Risk': '{:.2%}',
                     'Churn Rate %': '{:.1f}%',
                     'Revenue %': '{:.1f}%'
@@ -915,7 +918,7 @@ if rfm_data is not None:
                 xaxis_title="Customer Rank",
                 height=500
             )
-            fig.update_yaxes(title_text="Revenue (₦)", secondary_y=False)
+            fig.update_yaxes(title_text="Revenue (GH₵)", secondary_y=False)
             fig.update_yaxes(title_text="Cumulative Revenue %", secondary_y=True)
 
             st.plotly_chart(fig, use_container_width=True)
@@ -927,7 +930,7 @@ if rfm_data is not None:
             st.info(f"""
             **📊 Pareto Insight:**
             - Top **{customers_for_80_pct:,} customers** ({(customers_for_80_pct/len(filtered_rfm)*100):.1f}%) generate **80%** of total revenue
-            - These customers represent **₦{revenue_sorted['Monetary'][:customers_for_80_pct].sum()/1e9:.2f}B** in revenue
+            - These customers represent **GH₵{revenue_sorted['Monetary'][:customers_for_80_pct].sum()/1e9:.2f}B** in revenue
             - Focus retention efforts on these high-value customers
             """)
 
@@ -945,7 +948,7 @@ if rfm_data is not None:
                         x=dow_revenue.index,
                         y=dow_revenue.values,
                         title="Revenue by Day of Week",
-                        labels={'x': 'Day', 'y': 'Revenue (₦)'},
+                        labels={'x': 'Day', 'y': 'Revenue (GH₵)'},
                         color=dow_revenue.values,
                         color_continuous_scale='Viridis'
                     )
@@ -963,7 +966,7 @@ if rfm_data is not None:
                         x=month_revenue.index,
                         y=month_revenue.values,
                         title="Revenue by Month",
-                        labels={'x': 'Month', 'y': 'Revenue (₦)'},
+                        labels={'x': 'Month', 'y': 'Revenue (GH₵)'},
                         markers=True
                     )
                     fig.update_traces(line_color='#28a745', line_width=3)
